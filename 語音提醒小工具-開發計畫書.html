@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>語音提醒小工具 · 開發計畫書</title>
+<style>
+  :root{
+    --bg:#FAF9F6;
+    --surface:#FFFFFF;
+    --surface-soft:#F2F0EB;
+    --ink:#1E2421;
+    --ink-soft:#5A625D;
+    --line:#E3E0D8;
+    --accent:#0E6B5B;
+    --accent-soft:#E7F1EE;
+    --accent-ink:#FFFFFF;
+    --warn-soft:#F7EFE4;
+    --warn-ink:#8A5A18;
+    --radius:14px;
+    --radius-small:9px;
+    --space-1:8px; --space-2:14px; --space-3:22px; --space-4:34px; --space-5:52px;
+    --font-sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","PingFang SC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    font-size:16.5px;
+    line-height:1.72;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{
+    max-width:1060px;
+    margin:0 auto;
+    padding:0 clamp(18px,4vw,44px);
+  }
+  header.top{
+    padding:clamp(38px,7vw,74px) 0 var(--space-4);
+  }
+  .kicker{
+    font-size:13px;
+    letter-spacing:.16em;
+    color:var(--accent);
+    font-weight:700;
+    margin:0 0 14px;
+  }
+  h1{
+    font-size:clamp(28px,4.6vw,40px);
+    line-height:1.25;
+    margin:0 0 16px;
+    font-weight:800;
+    letter-spacing:.01em;
+  }
+  .lede{
+    font-size:clamp(16.5px,2vw,19px);
+    color:var(--ink-soft);
+    max-width:66ch;
+    margin:0;
+  }
+  .lede strong{color:var(--ink);}
+  /* 已确认的决定 */
+  .decisions{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:var(--space-2);
+    margin:var(--space-4) 0 0;
+  }
+  .decision{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:var(--space-2) var(--space-3);
+  }
+  .decision dt{
+    font-size:12.5px;
+    letter-spacing:.1em;
+    color:var(--accent);
+    font-weight:700;
+    margin:0 0 4px;
+  }
+  .decision dd{
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+  }
+  .decision dd small{
+    display:block;
+    font-weight:400;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin-top:3px;
+    line-height:1.55;
+  }
+  /* 页内导航 */
+  nav.toc{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 18px;
+    padding:14px 0;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    margin:var(--space-5) 0;
+    font-size:14.5px;
+  }
+  nav.toc a{
+    color:var(--accent);
+    text-decoration:none;
+    font-weight:600;
+    padding:2px 0;
+    border-bottom:2px solid transparent;
+  }
+  nav.toc a:hover{border-bottom-color:var(--accent);}
+  nav.toc a:focus-visible,
+  a:focus-visible{
+    outline:3px solid var(--accent);
+    outline-offset:3px;
+    border-radius:3px;
+  }
+  /* 章节 */
+  section{
+    margin-bottom:var(--space-5);
+  }
+  h2{
+    font-size:clamp(21px,2.8vw,26px);
+    margin:0 0 6px;
+    font-weight:800;
+    letter-spacing:.01em;
+  }
+  .h-sub{
+    color:var(--ink-soft);
+    margin:0 0 var(--space-3);
+    font-size:15.5px;
+    max-width:70ch;
+  }
+  h3{
+    font-size:17.5px;
+    margin:var(--space-3) 0 var(--space-1);
+    font-weight:700;
+  }
+  p{margin:0 0 var(--space-2);}
+  .prose{max-width:70ch;}
+  /* 使用流程时间线 */
+  ol.timeline{
+    list-style:none;
+    margin:var(--space-3) 0 0;
+    padding:0;
+    position:relative;
+  }
+  ol.timeline::before{
+    content:"";
+    position:absolute;
+    left:21px;
+    top:14px;
+    bottom:14px;
+    width:2px;
+    background:var(--line);
+  }
+  ol.timeline li{
+    position:relative;
+    padding:0 0 var(--space-3) 62px;
+    min-height:52px;
+  }
+  ol.timeline li:last-child{padding-bottom:4px;}
+  .step-dot{
+    position:absolute;
+    left:0;
+    top:0;
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    background:var(--surface);
+    border:2px solid var(--line);
+    color:var(--ink-soft);
+    font-weight:800;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  li.now .step-dot{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--accent-ink);
+    box-shadow:0 0 0 5px var(--accent-soft);
+  }
+  .step-title{
+    font-weight:700;
+    font-size:16.5px;
+    padding-top:9px;
+    display:block;
+  }
+  .step-note{
+    display:block;
+    color:var(--ink-soft);
+    font-size:14.5px;
+    line-height:1.65;
+    margin-top:2px;
+    max-width:64ch;
+  }
+  .bubble{
+    display:inline-block;
+    background:var(--surface-soft);
+    border-radius:14px 14px 14px 4px;
+    padding:6px 14px;
+    margin-top:6px;
+    font-size:14.5px;
+    color:var(--ink);
+  }
+  .bubble.ai{background:var(--accent-soft);border-radius:14px 14px 4px 14px;}
+  /* 表格 */
+  .table-wrap{
+    overflow-x:auto;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    margin-top:var(--space-3);
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:720px;
+    font-size:15px;
+  }
+  caption{
+    text-align:left;
+    padding:14px 18px 2px;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  th,td{
+    text-align:left;
+    padding:12px 18px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+  thead th{
+    font-size:13px;
+    letter-spacing:.06em;
+    color:var(--ink-soft);
+    background:var(--surface-soft);
+    border-bottom:2px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody tr:last-child th,
+  tbody tr:last-child td{border-bottom:none;}
+  tbody th{
+    font-weight:700;
+    white-space:nowrap;
+    font-size:15px;
+  }
+  td .how{color:var(--ink-soft);font-size:14px;line-height:1.6;display:block;margin-top:2px;}
+  td .how b{color:var(--ink);font-weight:600;}
+  /* 提示框 */
+  .note{
+    background:var(--accent-soft);
+    border-left:4px solid var(--accent);
+    border-radius:0 var(--radius-small) var(--radius-small) 0;
+    padding:14px 18px;
+    margin:var(--space-3) 0 0;
+    max-width:74ch;
+    font-size:15px;
+  }
+  .note.amber{
+    background:var(--warn-soft);
+    border-left-color:var(--warn-ink);
+    color:var(--ink);
+  }
+  .note b{font-weight:700;}
+  .note p:last-child{margin-bottom:0;}
+  /* 需要你操作 */
+  .todo-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+    gap:var(--space-2);
+    margin-top:var(--space-3);
+  }
+  .todo-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:var(--space-3);
+  }
+  .todo-card h3{margin-top:0;}
+  .todo-card ol{
+    margin:8px 0 0;
+    padding-left:22px;
+    color:var(--ink-soft);
+    font-size:15px;
+  }
+  .todo-card ol li{margin-bottom:6px;}
+  .todo-card ol li b{color:var(--ink);}
+  .tag{
+    display:inline-block;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.08em;
+    color:var(--accent);
+    background:var(--accent-soft);
+    border-radius:999px;
+    padding:3px 12px;
+    margin-bottom:8px;
+  }
+  /* 假设清单 */
+  ul.assumptions{
+    list-style:none;
+    padding:0;
+    margin:var(--space-3) 0 0;
+    max-width:74ch;
+  }
+  ul.assumptions li{
+    padding:10px 0 10px 34px;
+    border-bottom:1px dashed var(--line);
+    position:relative;
+  }
+  ul.assumptions li:last-child{border-bottom:none;}
+  ul.assumptions li::before{
+    content:"✓";
+    position:absolute;
+    left:2px;
+    top:10px;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:var(--accent-soft);
+    color:var(--accent);
+    font-size:13px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  ul.assumptions b{font-weight:700;}
+  /* 下一步 */
+  .next{
+    background:var(--ink);
+    color:#F3F2EE;
+    border-radius:var(--radius);
+    padding:var(--space-3) var(--space-4);
+    margin-bottom:var(--space-5);
+  }
+  .next h2{color:#fff;margin-bottom:10px;}
+  .next ol{margin:0;padding-left:22px;}
+  .next li{margin-bottom:8px;}
+  .next li:last-child{margin-bottom:0;}
+  .next .say{
+    display:inline-block;
+    background:var(--accent);
+    color:var(--accent-ink);
+    border-radius:8px;
+    padding:2px 12px;
+    font-weight:700;
+  }
+  .src{
+    font-size:13.5px;
+    color:var(--ink-soft);
+  }
+  .src a{color:var(--accent);}
+  footer.bottom{
+    padding:var(--space-2) 0 var(--space-5);
+    color:var(--ink-soft);
+    font-size:13.5px;
+    border-top:1px solid var(--line);
+  }
+  @media print{
+    body{background:#fff;font-size:12.5px;}
+    nav.toc{display:none;}
+    .table-wrap{overflow:visible;border:none;}
+    table{min-width:0;}
+    .next{background:#fff;color:#000;border:2px solid #000;}
+    .step-dot,li.now .step-dot{box-shadow:none;}
+    section{break-inside:avoid-page;}
+    a{color:inherit;text-decoration:underline;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    *{transition:none!important;animation:none!important;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <p class="kicker">開發計畫書 · 送你確認</p>
+  <h1>語音提醒小工具</h1>
+  <p class="lede">用說的就能建立提醒：打開網頁、按下麥克風，說出「<strong>下週三早上十點提醒我去繳信用卡卡費</strong>」，AI 跟你口頭確認後就完成設定——時間一到，提醒信會自動寄到指定對象的<span style="white-space:nowrap;">電子信箱</span>，電腦關機也照樣準時送出。</p>
+  <dl class="decisions">
+    <div class="decision">
+      <dt>形態</dt>
+      <dd>網頁版
+        <small>手機、電腦都用同一個網址；手機上加到主螢幕後就像 App 一樣全螢幕、有圖示。</small>
+      </dd>
+    </div>
+    <div class="decision">
+      <dt>提醒送達</dt>
+      <dd>電子郵件
+        <small>免費、收件人完全不用配合。微信官方不開放個人號自動發訊息，故改走郵件。</small>
+      </dd>
+    </div>
+    <div class="decision">
+      <dt>費用</dt>
+      <dd>全部免費
+        <small>開發、寄信、存放與定時執行都在免費額度內，不需要綁卡。</small>
+      </dd>
+    </div>
+  </dl>
+</header>
+
+<nav class="toc" aria-label="目錄">
+  <a href="#flow">它怎麼運作</a>
+  <a href="#features">功能與測試方法</a>
+  <a href="#you">需要你本人操作的 2 件事</a>
+  <a href="#cost">費用說明</a>
+  <a href="#assume">請你順便確認的假設</a>
+  <a href="#next">下一步</a>
+</nav>
+
+<main>
+
+<section id="flow">
+  <h2>一、它怎麼運作</h2>
+  <p class="h-sub">從打開網頁到收到提醒，整個過程是這樣的：</p>
+  <ol class="timeline">
+    <li>
+      <span class="step-dot" aria-hidden="true">1</span>
+      <span class="step-title">打開網址</span>
+      <span class="step-note">手機或電腦的瀏覽器都能開。手機上第一次打開後，選「加到主螢幕」，以後桌面就有一個圖示，點開直接全螢幕使用，跟一般 App 沒有兩樣。</span>
+    </li>
+    <li>
+      <span class="step-dot" aria-hidden="true">2</span>
+      <span class="step-title">輸入密碼登入</span>
+      <span class="step-note">你自設一組專用密碼，只有你能登入、發送和管理提醒。家人朋友什麼都不用裝、不用設定。</span>
+    </li>
+    <li class="now">
+      <span class="step-dot" aria-hidden="true">3</span>
+      <span class="step-title">點一下圓形麥克風按鈕</span>
+      <span class="step-note">AI 會先跟你打招呼：</span>
+      <span class="bubble ai">嗨，lpj，有什麼我可以幫忙的？</span>
+    </li>
+    <li class="now">
+      <span class="step-dot" aria-hidden="true">4</span>
+      <span class="step-title">用說的講出提醒</span>
+      <span class="step-note">自然地說出「誰」和「什麼時候」，例如：</span>
+      <span class="bubble">一小時後提醒小明去蝦皮店到店取貨</span>
+      <span class="bubble">下週三早上十點提醒我去繳信用卡卡費</span>
+    </li>
+    <li class="now">
+      <span class="step-dot" aria-hidden="true">5</span>
+      <span class="step-title">AI 口頭跟你確認</span>
+      <span class="step-note">AI 會把聽到的內容唸出來讓你確認：</span>
+      <span class="bubble ai">好的，我會在 11 月 4 日（週三）早上 10 點提醒你去繳信用卡卡費，確認嗎？</span>
+      <span class="step-note">你說「確認」就建立完成；說「不對」可以重新講一次。</span>
+    </li>
+    <li>
+      <span class="step-dot" aria-hidden="true">6</span>
+      <span class="step-title">再點一下麥克風結束對話</span>
+      <span class="step-note">提醒已經記錄下來。想繼續加下一條，不點結束直接說就行。</span>
+    </li>
+    <li>
+      <span class="step-dot" aria-hidden="true">7</span>
+      <span class="step-title">時間一到，提醒信自動寄出</span>
+      <span class="step-note">寄信的動作在網路上的一台「永遠開著的小電腦」上執行，所以你的手機、電腦全部關機也照樣準時送達對方的電子信箱。</span>
+    </li>
+    <li>
+      <span class="step-dot" aria-hidden="true">8</span>
+      <span class="step-title">顯示「已送出」，一星期後自動消失</span>
+      <span class="step-note">送出成功的提醒會標示「已送出」和寄送時間；一星期後自動從列表刪除，列表永遠清爽。</span>
+    </li>
+  </ol>
+</section>
+
+<section id="features">
+  <h2>二、功能清單與測試方法</h2>
+  <p class="h-sub">下面是會完成的每一個功能，以及到時候你（或我）怎麼驗收它真的能用。</p>
+  <div class="table-wrap">
+    <table>
+      <caption>表 1：功能與驗收測試方法，共 10 項</caption>
+      <thead>
+        <tr>
+          <th scope="col">功能</th>
+          <th scope="col">它做什麼</th>
+          <th scope="col">怎麼測試</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">密碼登入</th>
+          <td>只有你能進入工具、發送和管理提醒。</td>
+          <td><span class="how"><b>①</b> 輸入正確密碼 → 進入主畫面；<b>②</b> 故意輸錯 → 進不去並提示錯誤。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">收件人名單</th>
+          <td>把家人朋友的「稱呼 + 電子信箱」建檔，語音裡說「小明」就能自動對應到他的信箱。可新增、修改、刪除。</td>
+          <td><span class="how"><b>①</b> 新增「小明」填入信箱 → 名單出現；<b>②</b> 改信箱 → 顯示新信箱；<b>③</b> 刪除 → 從名單消失。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">語音對話建立提醒</th>
+          <td>點麥克風開始，AI 打招呼；你說出內容和時間，它能聽懂「一小時後」「下週三早上十點」這類自然說法。</td>
+          <td><span class="how">說「一小時後提醒我喝水」→ 列表出現這條提醒，且時間正確落在約一小時後。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">AI 口頭確認</th>
+          <td>建立之前，AI 先把聽到的時間、對象、事項唸出來；你說「確認」才真正建立。</td>
+          <td><span class="how">說一條提醒 → 聽到 AI 完整唸出時間與內容 → 說「確認」→ 建立成功；說「不對」→ 可重新講。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">提醒列表</th>
+          <td>所有提醒一目了然：還沒發的顯示倒數時間，發過的顯示「已送出」。</td>
+          <td><span class="how">建立 2 條不同時間的提醒 → 列表各顯示正確的預定時間；送出後狀態變化。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">準時寄送（雲端執行）</th>
+          <td>時間一到自動寄提醒信到對象的信箱，你的電腦手機關機也照送。</td>
+          <td><span class="how">設一條 <b>2 分鐘後</b>的提醒 → 把電腦關機 → 時間到後打開收件箱，信已經到了。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">「已送出」標記</th>
+          <td>信寄出後，該條提醒立即標示「已送出」與實際寄送時間。</td>
+          <td><span class="how">寄送完成後重新整理列表 → 該條顯示「已送出」與時間。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">一星期後自動刪除</th>
+          <td>已送出的提醒保留 7 天後自動從列表刪除。</td>
+          <td><span class="how">我會先造一條「7 天前已送出」的臨時測試紀錄驗證自動清除，再把工具交給你，你之後也能用實際提醒驗證。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">發送失敗處理</th>
+          <td>信箱填錯或寄送失敗時，該條顯示「發送失敗」，可以查看原因並重試，提醒不會默默不見。</td>
+          <td><span class="how">故意填一個不存在的信箱寄送 → 狀態顯示「發送失敗」→ 修正信箱後重試成功。</span></td>
+        </tr>
+        <tr>
+          <th scope="row">手機電腦兩用 · 介面與圖示</th>
+          <td>極簡現代風格、圓形麥克風主按鈕；手機加到主螢幕後顯示你的 icon.png 圖示、全螢幕運行。</td>
+          <td><span class="how">手機和電腦分別打開 → 版面都正常、麥克風按鈕好用；加到主螢幕 → 顯示你的圖示與全螢幕畫面。</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="you">
+  <h2>三、需要你本人操作的 2 件事</h2>
+  <p class="h-sub">其他所有事——開發、測試、部署——都由我代勞。只有以下兩件事必須由你親自做：</p>
+  <div class="todo-grid">
+    <div class="todo-card">
+      <span class="tag">第 1 件</span>
+      <h3>把 icon.png 傳給我</h3>
+      <p style="margin-bottom:0;">你提到圖示已放在專案資料夾，但目前我這邊還沒收到。<b>直接在對話中把 icon.png 傳給我</b>，我會把它設定成網頁圖示和手機主螢幕圖示。</p>
+    </div>
+    <div class="todo-card">
+      <span class="tag">第 2 件</span>
+      <h3>取得 Gmail「應用程式專用密碼」</h3>
+      <p>提醒信要從你的 Gmail 寄出，Google 規定必須用一組 16 位數的專用密碼（不是你的登入密碼）。實作時我會<b>一步一步帶你操作</b>，流程大約是：</p>
+      <ol>
+        <li>登入你的 Google 帳號</li>
+        <li>開啟「兩步驟驗證」（一次性的安全設定）</li>
+        <li>在安全設定頁生成 16 位「應用程式密碼」</li>
+        <li>把 Gmail 地址和這串密碼填進工具設定頁（或直接貼給我代填）</li>
+      </ol>
+      <p style="margin-bottom:0;font-size:14px;color:var(--ink-soft);">這串密碼只用來寄信，隨時可以在 Google 帳號後台作廢重設。</p>
+    </div>
+  </div>
+</section>
+
+<section id="cost">
+  <h2>四、費用說明</h2>
+  <p class="prose"><b>這個方案完全免費，不需要綁信用卡。</b>各環節的免費額度如下：</p>
+  <ul class="prose" style="margin-top:10px;">
+    <li><b>寄信（Gmail）：</b>個人 Gmail 每天可寄 500 封——你一天的提醒就算多到 50 條也遠遠用不到上限。</li>
+    <li><b>網頁存放與定時執行：</b>放在扣子平台的免費額度內，個人自用量足夠。</li>
+    <li><b>開發：</b>由我直接完成，不產生費用。</li>
+  </ul>
+  <div class="note amber">
+    <p><b>之後若想改用或加用「簡訊」提醒：</b>簡訊必須經過付費的簡訊服務商，大約每條台幣 1–3 元，並且要先預儲值。現在先不做；哪天想要了再告訴我，我會把申請、儲值的步驟逐步說明給你。</p>
+  </div>
+  <p class="src" style="margin-top:12px;">每日寄信上限依據：<a href="https://knowledge.workspace.google.com/admin/gmail/gmail-sending-limits-in-google-workspace" target="_blank" rel="noopener noreferrer">Google Workspace 官方說明</a>、<a href="https://cli.nylas.com/guides/gmail-smtp-settings" target="_blank" rel="noopener noreferrer">Nylas Gmail SMTP 設定指南</a>（一般 Gmail 帳號為每天 500 封）。</p>
+</section>
+
+<section id="assume">
+  <h2>五、我做的幾個假設，請你順便確認</h2>
+  <p class="h-sub">以下這些是我依常理做的決定，如果哪一條跟你想的不一樣，回覆時直接說哪一條要改：</p>
+  <ul class="assumptions">
+    <li><b>時間標準：</b>所有時間按台灣時間（UTC+8）計算。</li>
+    <li><b>說人名要先建檔：</b>語音裡說「提醒小明」，小明必須已經在收件人名單裡；沒建檔的名字 AI 會問你要寄去哪。</li>
+    <li><b>沒說人名的提醒，預設寄給你自己。</b></li>
+    <li><b>「一星期後自動刪除」</b>從寄送成功那天算起，第 7 天後清除。</li>
+    <li><b>一次對話建立一條提醒</b>，說完一條可以接著說下一條，不中斷對話。</li>
+    <li><b>提醒內容同時顯示在列表</b>，不需要解鎖手機打開 App 也能回頭確認自己設過什麼。</li>
+  </ul>
+</section>
+
+<section id="next" class="next" style="margin-bottom:0;">
+  <h2>六、下一步</h2>
+  <ol>
+    <li>這份計畫<b>看完沒問題</b>，直接回覆「<span class="say">確認開工</span>」，我就開始開發；</li>
+    <li>有想調整的地方，說一聲我就改計畫再給你過目；</li>
+    <li>順手把 <b>icon.png</b> 傳到對話中，我開發時直接用上。</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="bottom">
+  <p style="margin:0;">語音提醒小工具 · 開發計畫書 v1 · 2026-10-19 · 交付討論用，未開始實作</p>
+</footer>
+
+</div>
+<script>
+(function(){
+  try{
+    var links=document.querySelectorAll('nav.toc a[href^="#"]');
+    links.forEach(function(a){
+      a.addEventListener('click',function(e){
+        try{
+          var id=a.getAttribute('href').slice(1);
+          var target=document.getElementById(id);
+          if(target){
+            e.preventDefault();
+            target.scrollIntoView({behavior:'smooth',block:'start'});
+          }
+        }catch(err){}
+      });
+    });
+  }catch(err){}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+# ======================================================
+# 排除清單（.gitignore）
+# 目的：防止金鑰、密碼、憑證等機密檔案被存進版本庫上傳到雲端
+# ======================================================
+
+# ----- 機密與憑證（一律不上傳）-----
+*token*
+*secret*
+*Secret*
+*password*
+*passwd*
+*密碼*
+*金鑰*
+*憑證*
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+authorized_keys
+known_hosts
+credentials*.json
+client_secret*.json
+service-account*.json
+*.session
+auth.json
+
+# ----- 原始上傳副本（正式檔已存於專案資料夾 assets/ 內）-----
+icon_*.png
+
+# ----- 系統與暫存檔案 -----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak
+*~
+node_modules/
+dist/
+build/
+__pycache__/
