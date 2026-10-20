@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Mic } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -92,6 +93,16 @@ export function AuthGate({ mode, onSuccess }: AuthGateProps) {
 					<Button type="submit" className="w-full" disabled={loading}>
 						{loading ? "處理中…" : mode === "setup" ? "設置密碼並進入" : "登入"}
 					</Button>
+					{mode === "login" && (
+						<div className="pt-2 text-center">
+							<Link
+								href="/forgot-password"
+								className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-ink hover:underline"
+							>
+								忘記密碼？
+							</Link>
+						</div>
+					)}
 				</form>
 			</div>
 		</div>

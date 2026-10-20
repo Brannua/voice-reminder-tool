@@ -18,8 +18,9 @@ src/
 ├── lib/
 │   ├── auth.ts                     # scrypt 密碼雜湊 + HMAC 會話 cookie（vr_session）
 │   ├── settings.ts                 # settings 表讀寫（password_hash/self_email/user_name）
+│   ├── password-reset.ts           # 忘記密碼：驗證碼簽發/核驗、重置令牌、限流鎖定
 │   ├── timezone.ts                 # UTC+8 固定時區：語音/顯示時間格式化
-│   ├── mailer.ts                   # nodemailer 單例 + 提醒郵件模板
+│   ├── mailer.ts                   # nodemailer + SMTP 出口 IP 探測 + 提醒/重置郵件模板
 │   ├── scheduler.ts                # 每 60s 掃描到期提醒、7 天清理、runSchedulerTickOnce()
 │   ├── voice-parse.ts              # LLM 解析提醒/郵箱提取/確認分類
 │   ├── contacts.ts                 # 通訊錄查詢（findContactByName/getSelfContact/upsert）
@@ -27,18 +28,20 @@ src/
 │   └── types.ts                    # ConversationStage / Draft / Contact / Reminder 類型
 ├── app/
 │   ├── page.tsx                    # 主界面（登入閘門 + 麥克風 + 提醒列表）
+│   ├── forgot-password/page.tsx    # 忘記密碼向導（輸郵箱→驗證碼→新密碼→完成）
 │   ├── contacts/page.tsx           # 通訊錄管理
 │   ├── settings/page.tsx           # 設置（我的郵箱/稱呼/改密碼/SMTP 狀態）
 │   ├── manifest.ts                 # PWA manifest（圖標 /icon.png，用戶會自行替換）
 │   └── api/
 │       ├── auth/{status,setup,login,logout}/route.ts
+│       ├── auth/reset/{request-code,verify,reset}/route.ts # 忘記密碼三段式 API
 │       ├── contacts/route.ts       # GET/POST；contacts/[id]/route.ts PUT/DELETE
 │       ├── reminders/route.ts      # GET；reminders/[id]/route.ts DELETE（僅 pending）
 │       ├── reminders/[id]/retry/route.ts  # POST 重試（200 + {ok:false,error} 表示業務失敗）
 │       ├── settings/route.ts       # GET/PUT（改密碼需驗證當前密碼）
 │       └── voice/{greet,converse}/route.ts # TTS 問候 / ASR→LLM→TTS 對話管線
 └── storage/database/
-    ├── shared/schema.ts            # contacts/reminders/settings 表（drizzle 模型）
+    ├── shared/schema.ts            # contacts/reminders/settings/password_reset_codes 表（drizzle）
     └── supabase-client.ts          # service_role 客戶端（勿改）
 ```
 
@@ -50,11 +53,23 @@ src/
 稱呼匹配通訊錄：未說稱呼=「我」；名單沒有 → `expect_email`（語音追問郵箱，LLM 從口語提取，自動存入通訊錄）→
 `expect_confirm`（TTS 複述「…確認嗎？」）→ 說「確認」建單 /「不對」重來。可連續建立，再點麥克風結束。
 
+### 忘記密碼自助重置（`lib/password-reset.ts`）
+
+登入頁「忘記密碼？」→ `/forgot-password` 四步向導（郵箱→驗證碼→新密碼→完成），對應三個無登入態 API：
+
+1. `POST /api/auth/reset/request-code` `{email?}`：收件人白名單＝settings.self_email 與 GMAIL_USER（規範化去重）；顯式傳入的 email 必須在白名單內。真實寄信成功後才 upsert 記錄。回遮蔽郵箱，不回明文驗證碼。
+2. `POST /api/auth/reset/verify` `{email,code}`：核驗通過頒發一次性 resetToken（32B 隨機 hex，10min 有效）。
+3. `POST /api/auth/reset/reset` `{email,token,password}`：token 有效才用 `hashPassword` 寫 password_hash，成功後刪除該重置記錄。
+
+安全策略（常量集中在 password-reset.ts）：驗證碼 6 位、10min 有效、一次性（consumed_at）；同一 email 連續錯 5 次鎖定 15min（locked_until）；新碼發送間隔 ≥60s（last_sent_at）。驗證碼與 resetToken 均 scrypt 哈希落庫（code_hash/reset_token_hash 均 varchar(255)），明文僅 requestResetCode 返回、僅服務端可見。表 password_reset_codes 以 email 唯一。
+
 ### 定時發送
 
 `instrumentation.ts` 的 `register()` 在服務啟動時調用 `startScheduler()`：每 60s 掃描
 `status='pending' AND remind_at <= now()`，發信成功→`sent`（記 sent_at），失敗→`failed`；
 `sent` 超過 7 天自動刪除。**注意：改動 instrumentation/scheduler 後需重啟 dev server 才生效（HMR 不重跑 register()）。**
+
+SMTP 連接（`lib/mailer.ts`）：固定 587 + STARTTLS（465 在沙箱被屏蔽）。因沙箱出口對 Gmail 不同 IP 段連通性不穩（部分 A 記錄 TCP 超時），createTransporter 前先用 `dns.resolve4` 取全部 A 記錄並並發 TCP 探測，選最快可達 IP 直連，並以 `tls.servername='smtp.gmail.com'` 保證 SNI/證書校驗；可達 IP 會快取，遇到 ETIMEDOUT/ESOCKET/ECONNRESET 時清空快取重新探測重試一次。
 
 ## 開發命令
 

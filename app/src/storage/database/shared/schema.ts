@@ -2,10 +2,12 @@ import { sql } from "drizzle-orm"
 import {
 	boolean,
 	index,
+	integer,
 	pgTable,
 	serial,
 	text,
 	timestamp,
+	uniqueIndex,
 	varchar,
 } from "drizzle-orm/pg-core"
 
@@ -53,3 +55,23 @@ export const settings = pgTable("settings", {
 	value: text("value").notNull(),
 	updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 })
+
+export const passwordResetCodes = pgTable(
+	"password_reset_codes",
+	{
+		id: varchar("id", { length: 36 })
+			.primaryKey()
+			.default(sql`gen_random_uuid()`),
+		email: varchar("email", { length: 255 }).notNull(),
+		code_hash: varchar("code_hash", { length: 255 }).notNull(),
+		expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+		consumed_at: timestamp("consumed_at", { withTimezone: true }),
+		attempts: integer("attempts").notNull().default(0),
+		locked_until: timestamp("locked_until", { withTimezone: true }),
+		last_sent_at: timestamp("last_sent_at", { withTimezone: true }),
+		reset_token_hash: varchar("reset_token_hash", { length: 255 }),
+		reset_token_expires_at: timestamp("reset_token_expires_at", { withTimezone: true }),
+		created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(table) => [uniqueIndex("password_reset_codes_email_idx").on(table.email)],
+)
